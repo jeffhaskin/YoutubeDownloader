@@ -1,3 +1,9 @@
+# Manual Additions
+build
+dist
+"YouTube Downloader.dmg"
+"YouTubeDownloader.spec"
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

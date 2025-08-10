@@ -81,11 +81,14 @@ class YtDlpDownloader:
                 ydl.download([url])
 
             if selected_format == 'best' and convert_to_mp4 and self.downloaded_file:
+
                 time.sleep(2)
+
                 base, ext = os.path.splitext(self.downloaded_file)
                 if ext.lower() != '.mp4':
                     mp4_file = base + '.mp4'
                     try:
+
                         # Detect whether the file has a video stream
                         probe = subprocess.run(
                             [
@@ -113,6 +116,7 @@ class YtDlpDownloader:
 
                         subprocess.run(
                             cmd,
+
                             check=True,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE
