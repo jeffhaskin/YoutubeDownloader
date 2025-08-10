@@ -28,7 +28,7 @@ class YtDlpDownloader:
         if 'on_error' in self.callbacks:
             self.callbacks['on_error'](error_msg)
     
-    def download_video(self, url, output_dir, selected_format, with_subtitles=False, with_thumbnail=False):
+    def download_video(self, url, output_dir, selected_format, with_subtitles=False, with_thumbnail=False, convert_to_mp4=False):
         """Download video using yt-dlp"""
         # Configure yt-dlp options
         ydl_opts = {
@@ -75,18 +75,62 @@ class YtDlpDownloader:
         
         try:
             self.log_message(f"Starting download of {url}")
+            self.downloaded_file = None
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
+
+            if selected_format == 'best' and convert_to_mp4 and self.downloaded_file:
+                base, ext = os.path.splitext(self.downloaded_file)
+                if ext.lower() != '.mp4':
+                    mp4_file = base + '.mp4'
+                    try:
+                        # Detect whether the file has a video stream
+                        probe = subprocess.run(
+                            [
+                                'ffprobe', '-v', 'error', '-select_streams', 'v:0',
+                                '-show_entries', 'stream=codec_type', '-of', 'csv=p=0',
+                                self.downloaded_file
+                            ],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE
+                        )
+                        has_video = probe.stdout.strip() != b''
+
+                        # Build ffmpeg command based on presence of video stream
+                        if has_video:
+                            cmd = [
+                                'ffmpeg', '-y', '-i', self.downloaded_file,
+                                '-c:v', 'libx264', '-preset', 'ultrafast',
+                                '-c:a', 'copy', mp4_file
+                            ]
+                        else:
+                            cmd = [
+                                'ffmpeg', '-y', '-i', self.downloaded_file,
+                                '-vn', '-c:a', 'copy', mp4_file
+                            ]
+
+                        subprocess.run(
+                            cmd,
+                            check=True,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE
+                        )
+                        os.remove(self.downloaded_file)
+                        self.log_message(f"Converted to mp4: {os.path.basename(mp4_file)}")
+                    except subprocess.SubprocessError as e:
+                        self.on_error(f"ffmpeg conversion failed: {e}")
+                        return
+
             self.on_complete()
         except Exception as e:
             error_msg = str(e)
             self.on_error(error_msg)
     
-    def start_download(self, url, output_dir, selected_format, with_subtitles=False, with_thumbnail=False):
+    def start_download(self, url, output_dir, selected_format, with_subtitles=False, with_thumbnail=False, convert_to_mp4=False):
         """Start the download process in a separate thread"""
         download_thread = threading.Thread(
-            target=self.download_video, 
-            args=(url, output_dir, selected_format, with_subtitles, with_thumbnail)
+            target=self.download_video,
+            args=(url, output_dir, selected_format, with_subtitles, with_thumbnail, convert_to_mp4)
         )
         download_thread.daemon = True
         download_thread.start()
@@ -111,6 +155,7 @@ class YtDlpDownloader:
         
         elif d['status'] == 'finished':
             filename = d.get('filename', 'Unknown')
+            self.downloaded_file = filename
             self.log_message(f"Download finished: {os.path.basename(filename)}")
             self.update_progress('processing', None)
 

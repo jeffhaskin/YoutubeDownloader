@@ -68,11 +68,17 @@ class YtDlpGui(QMainWindow):
         self.format_combo = QComboBox()
         self.format_combo.addItems(["mp4", "mp3", "webm", "best"])
         self.format_combo.setCurrentIndex(3)  # Selects "best" (index 3)
-        
+
+        self.convert_mp4_check = QCheckBox("Convert to mp4 after download")
+
         format_layout.addWidget(format_label)
         format_layout.addWidget(self.format_combo)
+        format_layout.addWidget(self.convert_mp4_check)
         format_layout.addStretch(1)
         main_layout.addLayout(format_layout)
+
+        self.format_combo.currentTextChanged.connect(self.toggle_convert_checkbox)
+        self.toggle_convert_checkbox(self.format_combo.currentText())
         
         # Output directory section
         dir_layout = QHBoxLayout()
@@ -145,12 +151,16 @@ class YtDlpGui(QMainWindow):
     def browse_directory(self):
         """Open directory browser dialog"""
         directory = QFileDialog.getExistingDirectory(
-            self, 
+            self,
             "Select Output Directory",
             self.output_dir_entry.text()
         )
         if directory:
             self.output_dir_entry.setText(directory)
+
+    def toggle_convert_checkbox(self, text):
+        """Show or hide mp4 conversion option based on format selection"""
+        self.convert_mp4_check.setVisible(text == 'best')
     
     def log_message(self, message):
         """Add message to log display"""
@@ -204,14 +214,18 @@ class YtDlpGui(QMainWindow):
         selected_format = self.format_combo.currentText()
         with_subtitles = self.subtitles_check.isChecked()
         with_thumbnail = self.thumbnail_check.isChecked()
-        
+        convert_to_mp4 = (
+            self.convert_mp4_check.isChecked() if selected_format == 'best' else False
+        )
+
         # Start the download
         self.downloader.start_download(
-            url, 
-            output_dir, 
+            url,
+            output_dir,
             selected_format,
             with_subtitles,
-            with_thumbnail
+            with_thumbnail,
+            convert_to_mp4
         )
 
 def show_dependency_error(message):
