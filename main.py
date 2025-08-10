@@ -1,6 +1,7 @@
 import os
 import threading
 import subprocess
+import time
 import yt_dlp
 
 class YtDlpDownloader:
@@ -80,16 +81,42 @@ class YtDlpDownloader:
                 ydl.download([url])
 
             if selected_format == 'best' and convert_to_mp4 and self.downloaded_file:
+
+                time.sleep(2)
+
                 base, ext = os.path.splitext(self.downloaded_file)
                 if ext.lower() != '.mp4':
                     mp4_file = base + '.mp4'
                     try:
-                        subprocess.run(
+
+                        # Detect whether the file has a video stream
+                        probe = subprocess.run(
                             [
+                                'ffprobe', '-v', 'error', '-select_streams', 'v:0',
+                                '-show_entries', 'stream=codec_type', '-of', 'csv=p=0',
+                                self.downloaded_file
+                            ],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE
+                        )
+                        has_video = probe.stdout.strip() != b''
+
+                        # Build ffmpeg command based on presence of video stream
+                        if has_video:
+                            cmd = [
                                 'ffmpeg', '-y', '-i', self.downloaded_file,
                                 '-c:v', 'libx264', '-preset', 'ultrafast',
                                 '-c:a', 'copy', mp4_file
-                            ],
+                            ]
+                        else:
+                            cmd = [
+                                'ffmpeg', '-y', '-i', self.downloaded_file,
+                                '-vn', '-c:a', 'copy', mp4_file
+                            ]
+
+                        subprocess.run(
+                            cmd,
+
                             check=True,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE
